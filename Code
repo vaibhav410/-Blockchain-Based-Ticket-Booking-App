@@ -1,0 +1,377 @@
+import React, { useState, useEffect } from 'react';
+
+// --- Helper Icon Components (SVG) ---
+const TrainIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c-1.1 0-2-.9-2-2v-4h4v4c0 1.1-.9 2-2 2zM8 11V5c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2v6H8z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15h14" /></svg>;
+const FlightIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>;
+const BusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19.5c.9 0 1.75-.25 2.5-.75m-5 0c.75.5 1.6.75 2.5.75m-5.5-7H18a2 2 0 012 2v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5a2 2 0 012-2zm0 0V9a2 2 0 012-2h4a2 2 0 012 2v3.5" /></svg>;
+const CabIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
+const ShareIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.368a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" /></svg>;
+
+
+// --- MOCK (NAKLI) API DATABASE ---
+const mockDatabase = {
+    trains: {
+        vehicles: [
+            { id: '12951', name: 'MUMBAI RAJDHANI', from: 'MUMBAI CENTRAL', to: 'NEW DELHI' },
+            { id: '19038', name: 'AVADH EXPRESS', from: 'MUZAFFARPUR JN', to: 'BANDRA TERMINUS' },
+        ],
+        stations: [ { name: 'MUMBAI CENTRAL', code: 'MMCT' }, { name: 'NEW DELHI', code: 'NDLS' }, { name: 'LUCKNOW NR', code: 'LKO' }, ],
+        betweenStations: { 'MMCT-NDLS': [{ train_number: '12951', train_name: 'MUMBAI RAJDHANI', departure_time: '17:00', arrival_time: '08:32', duration: '15h 32m' }], },
+        liveStatus: { '19038': { train_name: 'AVADH EXPRESS', current_station_name: 'KOTA JN', status: 'Arrived', delay: 15 }, }
+    },
+    flights: { vehicles: [ { id: '6E-2021', name: 'INDIGO', from: 'DELHI (DEL)', to: 'MUMBAI (BOM)', boardingTime: '20:45', departureTime: '21:30', sequenceNo: '085', gateNo: '42B', class: 'ECONOMY', seatNo: '18A' }, { id: 'AI-805', name: 'AIR INDIA', from: 'BENGALURU (BLR)', to: 'CHENNAI (MAA)', boardingTime: '10:00', departureTime: '10:45', sequenceNo: '032', gateNo: '12A', class: 'BUSINESS', seatNo: '2F' }, ], },
+    buses: { vehicles: [ { id: 'UPSRTC-845', name: 'UPSRTC JANRATH', from: 'LUCKNOW', to: 'DELHI' }, { id: 'ZING-102', name: 'ZINGBUS', from: 'JAIPUR', to: 'GURUGRAM' }, ], },
+    cabs: { vehicles: [ { id: 'UB-112', name: 'UBER PREMIER', from: 'CONNAUGHT PLACE', to: 'IGI AIRPORT T3' }, { id: 'OL-458', name: 'OLA SEDAN', from: 'KORAMANGALA', to: 'INDIRANAGAR' }, ], }
+};
+
+// --- MOCK API & BLOCKCHAIN LOGIC ---
+async function bookTicketAPI(newTicketData, existingTickets) {
+    const SHA256 = async (text) => {
+        const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    };
+    const updatedTickets = [...existingTickets, newTicketData];
+    const TICKETS_PER_BLOCK = 3;
+    const blocks = [];
+    for (let i = 0; i < updatedTickets.length; i += TICKETS_PER_BLOCK) {
+        const blockTickets = updatedTickets.slice(i, i + TICKETS_PER_BLOCK);
+        const prevHash = blocks.length > 0 ? blocks[blocks.length - 1].hash : "0".repeat(64);
+        const blockData = { index: blocks.length, timestamp: blockTickets[0].timestamp, transactions: blockTickets, prevHash };
+        const hash = await SHA256(JSON.stringify(blockData));
+        blocks.push({ ...blockData, hash });
+    }
+    return { updatedTickets, blocks };
+}
+
+// --- Main App Component ---
+export default function App() {
+    // State
+    const [activeCategory, setActiveCategory] = useState('trains');
+    const [tickets, setTickets] = useState([]);
+    const [blocks, setBlocks] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [statusMessage, setStatusMessage] = useState('');
+    const [view, setView] = useState('tickets'); // Main view for the right pane
+    const [sharedTicket, setSharedTicket] = useState(null); // For displaying a shared ticket
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [ticketToShare, setTicketToShare] = useState(null);
+
+    // Effect to check for shared ticket data in URL on load
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const ticketData = params.get('ticketData');
+        if (ticketData) {
+            try {
+                const decodedData = atob(ticketData);
+                const ticketObject = JSON.parse(decodedData);
+                setSharedTicket(ticketObject);
+            } catch (error) {
+                console.error("Failed to parse shared ticket data:", error);
+                // Optionally show an error message to the user
+            }
+        }
+    }, []);
+
+    const categories = {
+        trains: { icon: <TrainIcon />, title: 'Trains', color: 'blue' },
+        flights: { icon: <FlightIcon />, title: 'Flights', color: 'sky' },
+        buses: { icon: <BusIcon />, title: 'Buses', color: 'red' },
+        cabs: { icon: <CabIcon />, title: 'Cabs', color: 'yellow' },
+    };
+
+    const handleOpenShareModal = (ticket) => {
+        setTicketToShare(ticket);
+        setIsShareModalOpen(true);
+    };
+
+    const handleSubmit = async (e, formData) => {
+        e.preventDefault();
+        if (!formData.passengerName || !formData.details.vehicleName) {
+            alert("Please fill passenger name and select a vehicle.");
+            return;
+        }
+        setIsLoading(true);
+        setView('tickets');
+        setStatusMessage('Processing Payment...');
+        await new Promise(res => setTimeout(res, 1000));
+        setStatusMessage('Payment Successful! Securing on Blockchain...');
+
+        const newTicket = {
+            type: activeCategory.slice(0, -1),
+            ticket_id: ${activeCategory.slice(0,1).toUpperCase()}TKT${(tickets.length + 1).toString().padStart(3, '0')},
+            ...formData,
+            paymentRef: PAY${Date.now()},
+            timestamp: new Date().toISOString(),
+            blockchainHash: "GENERATING..."
+        };
+
+        const { updatedTickets, blocks } = await bookTicketAPI(newTicket, tickets);
+        const lastBlock = blocks.length > 0 ? blocks[blocks.length - 1] : { hash: "N/A" };
+        newTicket.blockchainHash = lastBlock.hash;
+
+        setTickets(updatedTickets.map(t => t.ticket_id === newTicket.ticket_id ? newTicket : t));
+        setBlocks(blocks);
+        setStatusMessage('Ticket Booked Successfully!');
+        setIsLoading(false);
+
+        setTimeout(() => setStatusMessage(''), 3000);
+    };
+
+    // If a shared ticket is found in the URL, render only that ticket
+    if (sharedTicket) {
+        return <SharedTicketView ticket={sharedTicket} />;
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">
+            {isShareModalOpen && <ShareModal ticket={ticketToShare} onClose={() => setIsShareModalOpen(false)} />}
+            <div className="absolute top-0 left-0 w-full h-full bg-grid-gray-700/[0.2] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]"></div>
+            <div className="relative max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                <header className="text-center mb-10">
+                    <h1 className="text-4xl sm:text-5xl font-extrabold text-white">Unified Blockchain Ticketing</h1>
+                    <p className="text-gray-400 mt-2">Secure Bookings for Trains, Flights, Buses & Cabs</p>
+                </header>
+
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                    {/* --- LEFT PANE (FORMS) --- */}
+                    <div className="lg:col-span-2">
+                        <div className="bg-gray-800/70 backdrop-blur-sm border border-gray-700 p-6 rounded-xl shadow-2xl sticky top-8">
+                            <div className="grid grid-cols-4 gap-2 mb-6">
+                                {Object.keys(categories).map(key => ( <CategoryButton key={key} category={categories[key]} isActive={activeCategory === key} onClick={() => { setActiveCategory(key); setView('tickets'); }} /> ))}
+                            </div>
+                            {activeCategory === 'trains' && <TrainBookingView onSubmit={handleSubmit} setView={setView} isLoading={isLoading} statusMessage={statusMessage} />}
+                            {activeCategory === 'flights' && <FlightBookingForm onSubmit={handleSubmit} isLoading={isLoading} statusMessage={statusMessage} />}
+                            {(activeCategory === 'buses' || activeCategory === 'cabs') && <GenericBookingForm category={activeCategory} onSubmit={handleSubmit} isLoading={isLoading} statusMessage={statusMessage} />}
+                        </div>
+                    </div>
+
+                    {/* --- RIGHT PANE (RESULTS) --- */}
+                    <div className="lg:col-span-3 space-y-8">
+                         {view === 'tickets' && (
+                            <>
+                                <Section title="All Booked Tickets" data={tickets} renderItem={(ticket) => <TicketCard ticket={ticket} onShare={handleOpenShareModal} />} emptyMessage="Your booked tickets will appear here."/>
+                                <Section title="Unified Blockchain Records" data={blocks} renderItem={(block) => <Block block={block} />} emptyMessage="Book a ticket to create the first block."/>
+                            </>
+                        )}
+                        {view !== 'tickets' && <TrainUtilsView view={view} setView={setView}/>}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- Category Specific Components ---
+const TrainBookingView = ({ onSubmit, setView, isLoading, statusMessage }) => {
+    const [subTab, setSubTab] = useState('booking');
+    return(
+        <div>
+             <div className="flex border-b border-gray-700 mb-6">
+                <TabButton title="Booking" isActive={subTab === 'booking'} onClick={() => setSubTab('booking')} />
+                <TabButton title="Utilities" isActive={subTab === 'utilities'} onClick={() => setSubTab('utilities')} />
+            </div>
+            {subTab === 'booking' && <GenericBookingForm category="trains" onSubmit={onSubmit} isLoading={isLoading} statusMessage={statusMessage} />}
+            {subTab === 'utilities' && <TrainUtils setView={setView} />}
+        </div>
+    )
+}
+
+const GenericBookingForm = ({ category, onSubmit, isLoading, statusMessage }) => {
+    const [passengerName, setPassengerName] = useState('Vaibhav Kumar');
+    const [age, setAge] = useState(25);
+    const [bookingDate, setBookingDate] = useState(new Date().toISOString().split('T')[0]);
+    const [vehicleName, setVehicleName] = useState('');
+    const [from, setFrom] = useState('');
+    const [to, setTo] = useState('');
+    const [amount, setAmount] = useState(500);
+    const vehicleList = mockDatabase[category]?.vehicles || [];
+    useEffect(() => { setVehicleName(''); setFrom(''); setTo(''); }, [category]);
+    const handleVehicleChange = (e) => {
+        const selectedVehicle = vehicleList.find(v => v.id === e.target.value);
+        if (selectedVehicle) { setVehicleName(selectedVehicle.name); setFrom(selectedVehicle.from); setTo(selectedVehicle.to); }
+    };
+    const formData = { passengerName, age, bookingDate, amount, details: { vehicleName, from, to } };
+    return (
+        <div>
+            <h2 className="text-2xl font-bold mb-5 text-white">Book Your Secure {categories[category].title.slice(0,-1)} Ticket</h2>
+            <form onSubmit={(e) => onSubmit(e, formData)} className="space-y-4">
+                <InputFieldWithIcon label="Passenger Name" icon={<UserIcon />} value={passengerName} onChange={e => setPassengerName(e.target.value)} placeholder="Enter full name" />
+                <SelectField label={Select ${categories[category].title.slice(0,-1)}} onChange={handleVehicleChange}>
+                    <option value="">-- Choose a Vehicle --</option>
+                    {vehicleList.map(v => <option key={v.id} value={v.id}>{v.name} ({v.id})</option>)}
+                </SelectField>
+                <div className="grid grid-cols-2 gap-4"> <InputField label="From" value={from} readOnly /> <InputField label="To" value={to} readOnly /> </div>
+                <div className="grid grid-cols-2 gap-4"> <InputField label="Age" type="number" value={age} onChange={e => setAge(parseInt(e.target.value) || 0)} /> <InputField label="Booking Date" type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} /> </div>
+                <InputField label="Amount (₹)" type="number" value={amount} onChange={e => setAmount(parseInt(e.target.value) || 0)} />
+                <button type="submit" disabled={isLoading} className="w-full bg-amber-400 hover:bg-amber-500 disabled:bg-gray-600 text-gray-900 font-bold py-3 px-4 rounded-lg transition-all">{isLoading ? statusMessage : 'Purchase Ticket'}</button>
+                {statusMessage && isLoading && <p className="text-center text-amber-400 text-sm mt-2 animate-pulse">{statusMessage}</p>}
+            </form>
+        </div>
+    );
+};
+
+const FlightBookingForm = ({ onSubmit, isLoading, statusMessage }) => {
+    const [passengerName, setPassengerName] = useState('Vaibhav Kumar');
+    const [age, setAge] = useState(25);
+    const [bookingDate, setBookingDate] = useState(new Date().toISOString().split('T')[0]);
+    const [flightDetails, setFlightDetails] = useState({ vehicleName: '', from: '', to: '', boardingTime: '', departureTime: '', sequenceNo: '', gateNo: '', class: 'ECONOMY', seatNo: '' });
+    const [amount, setAmount] = useState(4500);
+    const vehicleList = mockDatabase.flights.vehicles;
+    const handleVehicleChange = (e) => {
+        const selected = vehicleList.find(v => v.id === e.target.value);
+        if (selected) { setFlightDetails({ vehicleName: selected.name, from: selected.from, to: selected.to, boardingTime: selected.boardingTime, departureTime: selected.departureTime, sequenceNo: selected.sequenceNo, gateNo: selected.gateNo, class: selected.class, seatNo: selected.seatNo }); } 
+        else { setFlightDetails({ vehicleName: '', from: '', to: '', boardingTime: '', departureTime: '', sequenceNo: '', gateNo: '', class: 'ECONOMY', seatNo: '' }); }
+    };
+    const formData = { passengerName, age, bookingDate, amount, details: flightDetails };
+    return (
+        <div>
+            <h2 className="text-2xl font-bold mb-5 text-white">Book Your Secure Flight Ticket</h2>
+            <form onSubmit={(e) => onSubmit(e, formData)} className="space-y-4">
+                <InputFieldWithIcon label="Passenger Name" icon={<UserIcon />} value={passengerName} onChange={e => setPassengerName(e.target.value)} />
+                <SelectField label="Select Flight" onChange={handleVehicleChange}>
+                    <option value="">-- Choose a Flight --</option>
+                    {vehicleList.map(v => <option key={v.id} value={v.id}>{v.name} ({v.id})</option>)}
+                </SelectField>
+                <div className="grid grid-cols-2 gap-4"> <InputField label="From" value={flightDetails.from} readOnly /> <InputField label="To" value={flightDetails.to} readOnly /> </div>
+                <div className="grid grid-cols-2 gap-4"> <InputField label="Boarding Time" value={flightDetails.boardingTime} readOnly /> <InputField label="Departure Time" value={flightDetails.departureTime} readOnly /> </div>
+                <div className="grid grid-cols-2 gap-4"> <InputField label="Gate" value={flightDetails.gateNo} readOnly /> <InputField label="Seat" value={flightDetails.seatNo} readOnly /> </div>
+                <div className="grid grid-cols-2 gap-4"> <InputField label="Class" value={flightDetails.class} readOnly /> <InputField label="Sequence" value={flightDetails.sequenceNo} readOnly /> </div>
+                <InputField label="Amount (₹)" type="number" value={amount} onChange={e => setAmount(parseInt(e.target.value) || 0)} />
+                <button type="submit" disabled={isLoading} className="w-full bg-amber-400 hover:bg-amber-500 disabled:bg-gray-600 text-gray-900 font-bold py-3 px-4 rounded-lg transition-all">{isLoading ? statusMessage : 'Purchase Ticket'}</button>
+                {statusMessage && isLoading && <p className="text-center text-amber-400 text-sm mt-2 animate-pulse">{statusMessage}</p>}
+            </form>
+        </div>
+    );
+};
+
+const TrainUtils = ({ setView }) => {
+    return(
+        <div className="space-y-6">
+            <div> <h2 className="text-2xl font-bold mb-4 text-white">Trains Between Stations</h2> <button onClick={() => setView('trains_between')} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"> Search Trains </button> </div>
+            <hr className="border-gray-700" />
+            <div> <h2 className="text-2xl font-bold mb-4 text-white">Live Train Status</h2> <button onClick={() => setView('live_status')} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"> Check Status </button> </div>
+        </div>
+    )
+}
+
+const TrainUtilsView = ({ view, setView }) => {
+    return (
+        <div>
+            <button onClick={() => setView('tickets')} className="mb-4 text-amber-400 hover:text-amber-500">← Back to Tickets</button>
+            {view === 'trains_between' && <Section title="Available Trains" data={mockDatabase.trains.betweenStations['MMCT-NDLS']} renderItem={(train) => <div>{train.train_name}</div>} />}
+            {view === 'live_status' && <Section title="Live Status" data={[mockDatabase.trains.liveStatus['19038']]} renderItem={(status) => <div>{status.train_name} - {status.status}</div>} />}
+        </div>
+    )
+}
+
+// --- Reusable UI Components ---
+const CategoryButton = ({ category, isActive, onClick }) => {
+    const colorClasses = { blue: 'border-blue-500 text-blue-400 bg-blue-900/50', sky: 'border-sky-500 text-sky-400 bg-sky-900/50', red: 'border-red-500 text-red-400 bg-red-900/50', yellow: 'border-yellow-500 text-yellow-400 bg-yellow-900/50', };
+    const activeColorClasses = { blue: 'bg-blue-500 text-white', sky: 'bg-sky-500 text-white', red: 'bg-red-500 text-white', yellow: 'bg-yellow-500 text-white', };
+    return ( <button onClick={onClick} className={flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all duration-200 ${isActive ? activeColorClasses[category.color] : colorClasses[category.color]}}> {category.icon} <span className="text-xs mt-1 font-semibold">{category.title}</span> </button> );
+};
+
+const TicketCard = ({ ticket, onShare }) => {
+    const { type, ticket_id, passenger, details, booking_date, amount, blockchainHash } = ticket;
+    const categoryInfo = categories[${type}s];
+    return (
+        <div className={`bg-gray-800 border-l-4 ${categoryInfo.color ? border-${categoryInfo.color}-500 : 'border-gray-500'} rounded-lg overflow-hidden shadow-lg`}>
+            <div className="p-4">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <p className={`text-xs font-mono ${categoryInfo.color ? text-${categoryInfo.color}-400 : 'text-gray-400'}`}>TICKET ID: {ticket_id}</p>
+                        <h3 className="text-xl font-bold text-white">{passenger}</h3>
+                        <p className="text-sm text-gray-300">{details.vehicleName}</p>
+                        <p className="text-xs text-gray-400 mt-1">{details.from} → {details.to}</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <button onClick={() => onShare(ticket)} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors"> <ShareIcon/> </button>
+                        <div className="bg-gray-700 p-1.5 rounded-md shadow-md"> <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(ID:${ticket_id},Pax:${passenger})}&bgcolor=374151&color=ffffff`} alt="QR Code" className="w-20 h-20"/> </div>
+                    </div>
+                </div>
+                 {type === 'flight' && (
+                    <div className="mt-4 pt-4 border-t border-gray-700 grid grid-cols-3 gap-4 text-center">
+                        <div><p className="text-gray-400 text-xs">Gate</p><p className="font-bold text-white">{details.gateNo}</p></div>
+                        <div><p className="text-gray-400 text-xs">Seat</p><p className="font-bold text-white">{details.seatNo}</p></div>
+                        <div><p className="text-gray-400 text-xs">Boarding</p><p className="font-bold text-white">{details.boardingTime}</p></div>
+                    </div>
+                )}
+            </div>
+            <div className="border-t border-gray-700"></div>
+            <div className="p-4 bg-gray-900/50 flex justify-between items-center text-sm">
+                <div><p className="text-gray-400 text-xs">Date</p><p className="text-gray-200 font-semibold">{booking_date}</p></div>
+                <div><p className="text-gray-400 text-xs">Amount</p><p className="text-gray-200 font-semibold">₹{amount}</p></div>
+                <div className="text-right max-w-[50%]"><p className="text-gray-400 text-xs">Blockchain Hash</p><p className="text-gray-500 font-mono text-xs truncate">{blockchainHash}</p></div>
+            </div>
+        </div>
+    );
+};
+
+const Block = ({ block }) => (
+    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 font-mono text-xs shadow-md">
+        <h3 className="text-md font-bold text-amber-400 mb-2">Block #{block.index}</h3>
+        <div className="space-y-2 break-all">
+            <p><strong className="text-gray-400">Prev Hash:</strong> <span className="text-gray-500">{block.prevHash}</span></p>
+            <p><strong className="text-gray-400">Curr Hash: </strong> <span className="text-white">{block.hash}</span></p>
+        </div>
+        <details className="mt-3">
+            <summary className="cursor-pointer text-gray-400 text-sm hover:text-amber-400">View {block.transactions.length} Transaction(s)</summary>
+            <div className="mt-2 space-y-1 pl-4 border-l-2 border-gray-700 text-gray-300">
+                {block.transactions.map(tx => <p key={tx.ticket_id}><strong>{tx.type.toUpperCase()}:</strong> {tx.passenger} ({tx.details.vehicleName})</p>)}
+            </div>
+        </details>
+    </div>
+);
+
+const ShareModal = ({ ticket, onClose }) => {
+    const [copySuccess, setCopySuccess] = useState('');
+    const ticketDataString = btoa(JSON.stringify(ticket));
+    const shareUrl = ${window.location.origin}${window.location.pathname}?ticketData=${ticketDataString};
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            setCopySuccess('Copied!');
+            setTimeout(() => setCopySuccess(''), 2000);
+        }, () => {
+            setCopySuccess('Failed to copy!');
+        });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md m-4">
+                <h2 className="text-xl font-bold text-white mb-4">Share Ticket</h2>
+                <p className="text-gray-400 mb-4">Anyone with this link can view this ticket. Share it with your family member.</p>
+                <div className="bg-gray-900 p-2 rounded-lg flex items-center">
+                    <input type="text" value={shareUrl} readOnly className="bg-transparent text-gray-300 w-full text-sm outline-none" />
+                    <button onClick={copyToClipboard} className="bg-amber-400 text-gray-900 font-bold py-1 px-3 rounded-md text-sm ml-2">
+                        {copySuccess || 'Copy'}
+                    </button>
+                </div>
+                <button onClick={onClose} className="mt-6 w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">
+                    Close
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const SharedTicketView = ({ ticket }) => {
+    return (
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+            <div className="w-full max-w-lg">
+                <h1 className="text-center text-3xl font-bold text-white mb-6">Shared Ticket Details</h1>
+                <TicketCard ticket={ticket} onShare={() => {}} />
+            </div>
+        </div>
+    );
+};
+
+// --- Simple Reusable Form & Section Components ---
+const InputField = ({ label, ...props }) => (<div><label className="block text-sm font-medium text-gray-400 mb-1">{label}</label><input className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-gray-200" {...props} /></div>);
+const InputFieldWithIcon = ({ label, icon, ...props }) => (<div><label className="block text-sm font-medium text-gray-400 mb-1">{label}</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">{icon}</div><input className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-3 py-2 text-gray-200" {...props} /></div></div>);
+const SelectField = ({ label, children, ...props }) => (<div><label className="block text-sm font-medium text-gray-400 mb-1">{label}</label><select className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-gray-200" {...props}>{children}</select></div>);
+const Section = ({ title, data, renderItem, emptyMessage }) => (<div><h2 className="text-3xl font-bold mb-4 text-white">{title}</h2><div className="space-y-4">{data.length > 0 ? [...data].reverse().map((item, index) => <div key={item.ticket_id || item.index || index}>{renderItem(item)}</div>) : <div className="text-center py-12 bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-700"><p className="text-gray-500">{emptyMessage}</p></div>}</div></div>);
+const TabButton = ({ title, isActive, onClick }) => (<button onClick={onClick} className={flex-1 py-2 text-sm font-semibold transition-all ${isActive ? 'text-amber-400 border-b-2 border-amber-400' : 'text-gray-400 hover:text-white'}}> {title} </button>);
+const categories = { trains: { icon: <TrainIcon />, title: 'Trains', color: 'blue' }, flights: { icon: <FlightIcon />, title: 'Flights', color: 'sky' }, buses: { icon: <BusIcon />, title: 'Buses', color: 'red' }, cabs: { icon: <CabIcon />, title: 'Cabs', color: 'yellow' }, };
