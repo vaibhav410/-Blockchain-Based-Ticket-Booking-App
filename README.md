@@ -19,4 +19,5 @@ Watch the demo video here: [Demo Video Link] (https://drive.google.com/file/d/1N
 1. Clone this repository:
    ```bash
    git clone https://github.com/yourusername/blockchain-ticket-app.git
+<img width="1545" height="765" alt="image" src="https://github.com/user-attachments/assets/c59f859d-8655-4054-8187-dc63390b420d" />
 
