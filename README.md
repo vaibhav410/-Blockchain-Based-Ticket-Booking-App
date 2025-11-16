@@ -82,60 +82,86 @@ Watch the demo video here: [Demo Video Link] (https://drive.google.com/file/d/1N
 Installation
 1️⃣ Clone the Repository
 Bash
-
-git clone https://github.com/yourusername/blockchain-ticket-app.git
+``git clone https://github.com/yourusername/blockchain-ticket-app.git
 cd blockchain-ticket-app
+``
+
 2️⃣ Install Dependencies
 Bash
+``npm install
+``
 
-npm install
 3️⃣ Setup Ganache
+
 Open Ganache and create a new workspace
+
 Set RPC Server to HTTP://127.0.0.1:7545
+
 Note down the mnemonic phrase
+
 4️⃣ Configure MetaMask
 Install MetaMask browser extension
+
 Import accounts using Ganache mnemonic
+
 Connect to localhost:7545 network
+
 5️⃣ Compile Smart Contracts
 Bash
+``truffle compile
+``
 
-truffle compile
 6️⃣ Deploy to Local Blockchain
 Bash
+``truffle migrate --reset
+``
 
-truffle migrate --reset
 7️⃣ Run Tests (Optional)
 Bash
+``truffle test
+``
 
-truffle test
 8️⃣ Start the Frontend
 Bash
+``npm start
+``
 
-npm start
-# or simply open index.html in your browser
+### or simply open index.html in your browser
+
 📖 Usage
 Booking a Ticket
+
 Connect Wallet
 
 Click "Connect Wallet" button
+
 Approve MetaMask connection
+
 Select Service
 
 Choose from Railway, Flight, Bus, or Cab
+
 Enter Details
 
 Fill in travel information (origin, destination, date)
+
 Review pricing
+
 Confirm Transaction
 
 Approve transaction in MetaMask
+
 Wait for blockchain confirmation
+
 Receive Ticket
 
 Get unique ticket ID and QR code
+
 Ticket is stored on blockchain
+
 Verifying a Ticket
+
+
 JavaScript
 
 // Check ticket validity
@@ -165,10 +191,15 @@ contract TicketBooking {
     function cancelTicket(...) public { }
 }
 Key Functions
+
 Function	Description	Access
-bookTicket()	Create a new ticket	Public (Payable)
-verifyTicket()	Check ticket validity	Public (View)
-transferTicket()	Transfer ownership	Owner Only
-cancelTicket()	Cancel and refund	Owner Only
+
+bookTicket()-	Create a new ticket	Public (Payable)
+
+verifyTicket()-	Check ticket validity	Public (View)
+
+transferTicket()-	Transfer ownership	Owner Only
+
+cancelTicket()-	Cancel and refund	Owner Only
 
 
